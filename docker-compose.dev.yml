@@ -53,47 +53,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      # Application Configuration
-      TZ: UTC
-      PORT: 3333
-      HOST: 0.0.0.0
-      LOG_LEVEL: info
-      APP_KEY: pMfSR2S2zqAQoo7sKJs8h4GYwM614EYy
-      NODE_ENV: development
-      SESSION_DRIVER: cookie
-      DRIVE_DISK: fs
-
-      # Database Configuration
-      DB_CONNECTION: postgres
-
-      # PostgreSQL Configuration (updated for Docker network)
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USERNAME: hr_user
-      DB_PASSWORD: hr_password_dev
-      DB_DATABASE: hr_scanning_dev
-      DB_SSL: false
-      DB_POOL_MIN: 2
-      DB_POOL_MAX: 10
-      DB_DEBUG: false
-
-      # Legacy database connection environment variables (for compatibility)
-      DATABASE_URL: "postgresql://hr_user:hr_password_dev@postgres:5432/hr_scanning_dev"
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: hr_scanning_dev
-      POSTGRES_USER: hr_user
-      POSTGRES_PASSWORD: hr_password_dev
-      IS_DOCKER: true
-
-
-
-      # OpenAI Configuration
-      OPENAI_API_KEY:
-
-      # Rate Limiting
-      LIMITER_STORE: database
+    env_file:
+      - .env.dev
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3333 || exit 1"]
       interval: 30s
