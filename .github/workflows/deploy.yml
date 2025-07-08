@@ -34,7 +34,7 @@ jobs:
           port: 22
           script: |
             git pull
-            cd cm-deployment
+            cd hr-deployment
             docker system prune -f
             docker compose -f docker-compose.dev.yml pull
             docker compose -f docker-compose.dev.yml up -d

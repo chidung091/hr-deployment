@@ -1,19 +1,99 @@
-version: "3"
-
 services:
-  nextjs-app:
-    image: ghcr.io/tunglam99/nextjs-app:dev-latest
+  postgres:
+    image: postgres:15-alpine
+    container_name: hr-scanning-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hr_scanning_dev
+      POSTGRES_USER: hr_user
+      POSTGRES_PASSWORD: hr_password_dev
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --lc-collate=C --lc-ctype=C'
     ports:
-      - "4000:4000" # Different port for dev
-    restart: always
+      - '5433:5432'
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - hr-scanning-dev
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4000 || exit 1"]
+      test: ['CMD-SHELL', 'pg_isready -U hr_user -d hr_scanning_dev']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_parallel_maintenance_workers=4
+
+  # Redis for caching (optional, for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: hr-scanning-redis-dev
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - hr-scanning-dev
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  nextjs-app:
+    image: ghcr.io/chidung091/hr-scanning:dev-latest
+    ports:
+      - "3333:3333" # Different port for dev
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database connection environment variables
+      DATABASE_URL: "postgresql://hr_user:hr_password_dev@postgres:5432/hr_scanning_dev"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: hr_scanning_dev
+      POSTGRES_USER: hr_user
+      POSTGRES_PASSWORD: hr_password_dev
+      # Redis connection
+      REDIS_URL: "redis://redis:6379"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Node environment
+      NODE_ENV: development
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3333 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
     platform: linux/x86_64
     volumes:
       - ./public:/usr/share/nginx/html/public # Make sure the public folder is correctly mounted
+    networks:
+      - hr-scanning-dev
 
   nginx:
     image: nginx:latest
@@ -31,3 +111,16 @@ services:
       timeout: 10s
       retries: 3
     platform: linux/x86_64
+    networks:
+      - hr-scanning-dev
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  hr-scanning-dev:
+    driver: bridge
+    name: hr-scanning-dev
