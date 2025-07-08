@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:15-alpine
+    hostname: postgres
     container_name: hr-scanning-postgres-dev
     restart: unless-stopped
     environment:
@@ -42,23 +43,7 @@ services:
       -c max_parallel_workers=8
       -c max_parallel_maintenance_workers=4
 
-  # Redis for caching (optional, for future use)
-  redis:
-    image: redis:7-alpine
-    container_name: hr-scanning-redis-dev
-    restart: unless-stopped
-    ports:
-      - '6379:6379'
-    volumes:
-      - redis_dev_data:/data
-    networks:
-      - hr-scanning-dev
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
 
   nextjs-app:
     image: ghcr.io/chidung091/hr-scanning:dev-latest
@@ -68,22 +53,46 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
-      # Database connection environment variables
+      # Application Configuration
+      TZ: UTC
+      PORT: 3333
+      HOST: localhost
+      LOG_LEVEL: info
+      APP_KEY: pMfSR2S2zqAQoo7sKJs8h4GYwM614EYy
+      NODE_ENV: development
+      SESSION_DRIVER: cookie
+      DRIVE_DISK: fs
+
+      # Database Configuration
+      DB_CONNECTION: postgres
+
+      # PostgreSQL Configuration (updated for Docker network)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: hr_user
+      DB_PASSWORD: hr_password_dev
+      DB_DATABASE: hr_scanning_dev
+      DB_SSL: false
+      DB_POOL_MIN: 2
+      DB_POOL_MAX: 10
+      DB_DEBUG: false
+
+      # Legacy database connection environment variables (for compatibility)
       DATABASE_URL: "postgresql://hr_user:hr_password_dev@postgres:5432/hr_scanning_dev"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: hr_scanning_dev
       POSTGRES_USER: hr_user
       POSTGRES_PASSWORD: hr_password_dev
-      # Redis connection
-      REDIS_URL: "redis://redis:6379"
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # Node environment
-      NODE_ENV: development
+
+
+
+      # OpenAI Configuration
+      OPENAI_API_KEY:
+
+      # Rate Limiting
+      LIMITER_STORE: database
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3333 || exit 1"]
       interval: 30s
@@ -116,8 +125,6 @@ services:
 
 volumes:
   postgres_dev_data:
-    driver: local
-  redis_dev_data:
     driver: local
 
 networks:
