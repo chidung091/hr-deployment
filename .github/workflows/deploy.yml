@@ -33,8 +33,8 @@ jobs:
           password: ${{ secrets.DO_DEV_SSH_PASSWORD }}
           port: 22
           script: |
-            git pull
             cd hr-deployment
+            git pull
             docker system prune -f
             docker compose -f docker-compose.dev.yml pull
             docker compose -f docker-compose.dev.yml up -d
