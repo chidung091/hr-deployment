@@ -8,23 +8,23 @@ jobs:
   deploy_dev:
     name: Deploy to Development
     runs-on: ubuntu-latest
-    environment: dev # Associate the job with the 'dev' environment
+    environment: dev
 
     steps:
-      - name: Check if the secret exists
+      - name: ✅ Check if the secret exists
         run: |
           if [ -z "${{ secrets.DO_DEV_SSH_PASSWORD }}" ]; then
-            echo "DO_DEV_SSH_PASSWORD is not set."
+            echo "❌ DO_DEV_SSH_PASSWORD is not set."
             exit 1
           else
-            echo "DO_DEV_SSH_PASSWORD is set."
+            echo "✅ DO_DEV_SSH_PASSWORD is set."
           fi
 
-      - name: Only run for dev environment
+      - name: 🚀 Only run for dev environment
         if: github.event.action == 'deploy_dev'
         run: echo "Deploying to development environment"
 
-      - name: Connect to DigitalOcean via SSH and deploy (Dev)
+      - name: 🔐 Connect to DigitalOcean via SSH and deploy (Dev)
         if: github.event.action == 'deploy_dev'
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -35,31 +35,44 @@ jobs:
           script: |
             cd hr-deployment
             git pull
-            docker system prune -f
-            docker compose -f docker-compose.dev.yml pull
-            docker compose -f docker-compose.dev.yml up -d --build --pull always
 
-  # deploy_prod:
-  #   name: Deploy to Production
-  #   runs-on: ubuntu-latest
-  #   environment: prod # For the production environment secrets
-
-  #   steps:
-  #     - name: Only run for prod environment
-  #       if: github.event.action == 'deploy_prod'
-  #       run: echo "Deploying to production environment"
-
-  #     - name: Connect to DigitalOcean via SSH and deploy (Prod)
-  #       if: github.event.action == 'deploy_prod'
-  #       uses: appleboy/ssh-action@v0.1.5
-  #       with:
-  #         host: ${{ secrets.DO_PROD_DROPLET_IP }} # Make sure the prod secrets are defined
-  #         username: ${{ secrets.DO_PROD_DROPLET_USER }}
-  #         password: ${{ secrets.DO_PROD_SSH_PASSWORD }}
-  #         port: 22
-  #         script: |
-  #           git pull
-  #           cd cm-deployment
-  #           docker system prune -f
-  #           docker compose -f docker-compose.prod.yml pull
-  #           docker compose -f docker-compose.prod.yml up -d
+            echo "⚙️ Generating .env.dev from GitHub Secrets..."
+            cat <<EOF > .env.dev
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            
+            TZ=UTC
+            PORT=3333
+            HOST=0.0.0.0
+            LOG_LEVEL=info
+            APP_KEY=pMfSR2S2zqAQoo7sKJs8h4GYwM614EYy
+            NODE_ENV=development
+            SESSION_DRIVER=cookie
+            DRIVE_DISK=fs
+            
+            DB_CONNECTION=postgres
+            DB_HOST=postgres
+            DB_PORT=5432
+            DB_USERNAME=hr_user
+            DB_PASSWORD=hr_password_dev
+            DB_DATABASE=hr_scanning_dev
+            DB_SSL=false
+            DB_POOL_MIN=2
+            DB_POOL_MAX=10
+            DB_DEBUG=false
+            
+            DATABASE_URL=postgresql://hr_user:hr_password_dev@postgres:5432/hr_scanning_dev
+            POSTGRES_HOST=postgres
+            POSTGRES_PORT=5432
+            POSTGRES_DB=hr_scanning_dev
+            POSTGRES_USER=hr_user
+            POSTGRES_PASSWORD=hr_password_dev
+            IS_DOCKER=true
+            
+            LIMITER_STORE=database
+            EOF
+            
+                        echo "🧹 Cleaning Docker & deploying containers..."
+                        docker system prune -f
+                        docker compose -f docker-compose.dev.yml --env-file .env.dev pull
+                        docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build --pull always
+            
