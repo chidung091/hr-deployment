@@ -1,0 +1,26 @@
+services:
+  nextjs-app:
+    image: ghcr.io/tunglam99/nextjs-app:latest # Placeholder for pushing image to Dockerhub
+    ports:
+      - "4000:4000"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    platform: linux/x86_64
+  nginx:
+    image: nginx:latest
+    depends_on:
+      - nextjs-app
+    ports:
+      - "80:80" # Exposing NGINX on port 80
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Map custom NGINX config
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
